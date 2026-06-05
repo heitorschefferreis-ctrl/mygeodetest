@@ -2,52 +2,42 @@ name: Build Geode Mod
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
+        # Compila para Windows, Android de 32 bits e Android de 64 bits de uma vez so!
         config:
-          - name: Windows
-            os: windows-2022
-          - name: macOS
-            os: macos-14
-          - name: Android32
-            os: ubuntu-latest
-            target: Android32
-          - name: Android64
-            os: ubuntu-latest
-            target: Android64
+        - name: Windows
+          os: windows-latest
+        - name: Android32
+          os: ubuntu-latest
+          target: Android32
+        - name: Android64
+          os: ubuntu-latest
+          target: Android64
 
-    name: Build ${{ matrix.config.name }}
+    name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout do Repositorio
+      uses: actions/checkout@v4
 
-      - name: Build Mod
-        uses: geode-sdk/build-geode-mod@main
-        with:
-          target: ${{ matrix.config.target }}
-          combine: true
+    - name: Rodar o Compilador do Geode SDK
+      uses: geode-sdk/build-geode-mod@main
+      with:
+        bindings: geode-sdk/bindings
+        bindings-ref: main
+        target: ${{ matrix.config.target }}
 
-  package:
-    name: Package Builds
-    runs-on: ubuntu-latest
-    needs: ['build']
-
-    steps:
-      - name: Merge Platform Builds
-        uses: geode-sdk/build-geode-mod/combine@main
-        id: merge
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: geode-build-output
-          path: ${{ steps.merge.outputs.build-output }}
+    - name: Upload do Arquivo .geode Compilado
+      uses: actions/allowed-artifacts@v1
+      with:
+        name: ${{ matrix.config.name }}-build
+        path: build/*.geode

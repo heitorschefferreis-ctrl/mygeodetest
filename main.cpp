@@ -1,144 +1,126 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
-#include <set>
-#include <vector>
 
 using namespace geode::prelude;
 
-// We extend PlayLayer to manage the visual pathfinding node and state machine
-class $modify(PathfindPlayLayer, PlayLayer) {
-    struct Fields {
-        cocos2d::CCDrawNode* m_pathDrawNode = nullptr;
-        bool m_isJumping = false;
-        float m_jumpTimer = 0.0f;
-        std::set<GameObject*> m_clickedOrbs;
-        float m_lastPlayerX = 0.0f;
-    };
+// IDs das Orbs para o bot saber quando clicar no ar
+enum GDOrbs {
+    OrbAmarela = 35,
+    OrbRosa = 140,
+    OrbVermelha = 1332,
+    OrbAzul = 84,
+    OrbVerde = 1022,
+    DashOrbVerde = 1704,
+    DashOrbRosa = 1751
+};
 
-    bool init(GJGameLevel* level, bool useReplay, bool dontPlay) {
-        if (!PlayLayer::init(level, useReplay, dontPlay)) return false;
-
-        // Create the visual pathfinding overlay
-        m_fields->m_pathDrawNode = cocos2d::CCDrawNode::create();
-        // Add node on top of play layer gameplay elements
-        this->addChild(m_fields->m_pathDrawNode, 9999);
-
-        return true;
-    }
+class $modify(MyPlayLayer, PlayLayer) {
+    bool segurandoDash = false;
+    float cronometroDash = 0.0f;
 
     void update(float dt) {
         PlayLayer::update(dt);
 
-        // Check settings
-        bool pathfindEnabled = Mod::get()->getSettingValue<bool>("pathfinding-enabled");
-        if (!pathfindEnabled) {
-            if (m_fields->m_pathDrawNode) {
-                m_fields->m_pathDrawNode->clear();
-            }
-            return;
-        }
+        if (!this->m_player1) return;
 
-        if (!m_player1 || m_player1->m_isDead) return;
+        auto player = this->m_player1;
+        cocos2d::CCPoint posPlayer = player->m_position;
+        
+        // Pega o tamanho físico (Hitbox) do próprio jogador
+        cocos2d::CCRect hitboxPlayer = player->boundingBox();
 
-        bool pathfindOrbs = Mod::get()->getSettingValue<bool>("pathfind-orbs");
-        bool pathfindSpikes = Mod::get()->getSettingValue<bool>("pathfind-spikes");
-        bool pathfindVisuals = Mod::get()->getSettingValue<bool>("pathfind-visuals");
+        // Identificando os Modos de Jogo principais para a física
+        bool isCube  = !player->m_isShip && !player->m_isBall && !player->m_isBird && !player->m_isDart && !player->m_isRobot && !player->m_isSpider && !player->m_isSwing;
+        bool isShip  = player->m_isShip;
+        bool isBall  = player->m_isBall;
+        bool isUFO   = player->m_isBird;
+        bool isWave  = player->m_isDart;
+        bool isRobot = player->m_isRobot;
+        bool isSpider = player->m_isSpider;
+        bool isSwing = player->m_isSwing;
 
-        float pX = m_player1->getPositionX();
-        float pY = m_player1->getPositionY();
-        cocos2d::CCPoint playerPos = m_player1->getPosition();
-
-        if (m_fields->m_pathDrawNode) {
-            m_fields->m_pathDrawNode->clear();
-        }
-
-        // Maintain the active jumping simulator state machine
-        if (m_fields->m_isJumping) {
-            m_fields->m_jumpTimer -= dt;
-            if (m_fields->m_jumpTimer <= 0.0f) {
-                this->releaseButton(0, PlayerButton::Jump);
-                m_fields->m_isJumping = false;
+        // Segurança da Dash Orb
+        if (segurandoDash) {
+            cronometroDash += dt;
+            if (cronometroDash > 1.5f || player->m_isDead) {
+                player->releaseButton(PlayerButton::Jump);
+                segurandoDash = false;
             }
         }
 
-        // Clear clicked orbs if we reset or go backwards
-        if (pX < m_fields->m_lastPlayerX - 50.0f) {
-            m_fields->m_clickedOrbs.clear();
-        }
-        m_fields->m_lastPlayerX = pX;
+        // 🔍 ENGINE GEOMÉTRICA DE VARREDURA (Lendo Hitboxes)
+        auto objetos = this->m_objects;
+        CCObject* obj = nullptr;
+        
+        CCARRAY_FOREACH(objetos, obj) {
+            auto gameObj = static_cast<GameObject*>(obj);
+            
+            // Pega a Hitbox Real do Objeto no frame atual (resolve os espinhos triplos colados!)
+            cocos2d::CCRect hitboxObjeto = gameObj->boundingBox();
+            
+            // Calcula a distância real em pixels entre a frente do player e o início do objeto
+            float distX = hitboxObjeto.getMinX() - hitboxPlayer.getMaxX();
+            float distY = hitboxObjeto.getMinY() - hitboxPlayer.getMaxY();
 
-        // Search nearby gameplay objects to calculate paths
-        if (m_objects) {
-            for (int i = 0; i < m_objects->count(); ++i) {
-                auto obj = static_cast<GameObject*>(m_objects->objectAtIndex(i));
-                if (!obj) continue;
-
-                float oX = obj->getPositionX();
-                float oY = obj->getPositionY();
-                float distanceX = oX - pX;
-                float distanceY = std::abs(oY - pY);
-
-                // Only evaluate objects currently ahead of the player in immediate viewport
-                if (distanceX > -30.0f && distanceX < 180.0f) {
+            // Só processa objetos que estão logo à frente (até 160 pixels)
+            if (distX > -10.0f && distX < 160.0f) {
+                
+                // 🔺 TRATAMENTO DE ACIDENTES (Qualquer tipo de Espinho Individual ou Agrupado)
+                if (gameObj->m_objectType == GameObjectType::Hazard) {
                     
-                    // ORB DETECTOR (Can be toggled off to discover Swag Routes)
-                    bool isOrb = (obj->m_objectType == GameObjectType::RegularRing || 
-                                  obj->m_objectType == GameObjectType::GravityRing || 
-                                  obj->m_objectType == GameObjectType::Special ||
-                                  obj->m_objectType == GameObjectType::CustomRing);
-                    
-                    if (isOrb && pathfindOrbs) {
-                        // Standard trigger boundary check
-                        if (distanceX > -15.0f && distanceX < 45.0f && distanceY < 65.0f) {
-                            if (m_fields->m_clickedOrbs.find(obj) == m_fields->m_clickedOrbs.end()) {
-                                // Jump / click orb
-                                this->pushButton(0, PlayerButton::Jump);
-                                m_fields->m_isJumping = true;
-                                m_fields->m_jumpTimer = 0.08f;
-                                m_fields->m_clickedOrbs.insert(obj);
-
-                                // Visual connection path
-                                if (pathfindVisuals && m_fields->m_pathDrawNode) {
-                                    m_fields->m_pathDrawNode->drawSegment(
-                                        playerPos, 
-                                        obj->getPosition(), 
-                                        3.0f, 
-                                        cocos2d::ccc4f(0.0f, 1.0f, 0.5f, 1.0f)
-                                    );
-                                }
-                            }
+                    // Se for Cubo, Robô, Bola ou Aranha e o espinho (ou os 3 colados) estiver chegando perto:
+                    if ((isCube || isRobot || isBall || isSpider) && player->m_isGrounded) {
+                        // Ajusta o tempo de reação baseado na distância da frente do obstáculo
+                        if (distX < 55.0f) { 
+                            player->pushButton(PlayerButton::Jump);
+                            log::info("🤖 AI: Perigo detectado via Hitbox a {}px! Pulando...", distX);
                         }
                     }
-
-                    // SPIKE / HAZARD DETECTOR (Used to skip spikes automatically)
-                    bool isHazard = (obj->m_objectType == GameObjectType::Hazard);
-                    if (isHazard && pathfindSpikes) {
-                        // Check if hazard is close and we are on the ground
-                        if (distanceX > 5.0f && distanceX < 65.0f && distanceY < 50.0f) {
-                            if (m_player1->m_isOnGround && !m_fields->m_isJumping) {
-                                // Execute path jump over the upcoming spike
-                                this->pushButton(0, PlayerButton::Jump);
-                                m_fields->m_isJumping = true;
-                                m_fields->m_jumpTimer = 0.18f;
-
-                                // Draw indicator vector for hazard path
-                                if (pathfindVisuals && m_fields->m_pathDrawNode) {
-                                    m_fields->m_pathDrawNode->drawSegment(
-                                        playerPos, 
-                                        obj->getPosition(), 
-                                        2.0f, 
-                                        cocos2d::ccc4f(1.0f, 0.2f, 0.2f, 1.0f)
-                                    );
-                                    m_fields->m_pathDrawNode->drawDot(
-                                        obj->getPosition(), 
-                                        8.0f, 
-                                        cocos2d::ccc4f(1.0f, 0.0f, 0.0f, 0.8f)
-                                    );
-                                }
-                            }
-                        }
+                    // Desvio para modos aéreos (Nave, Onda, Swing)
+                    else if ((isShip || isWave || isSwing) && abs(distY) < 35.0f && distX < 65.0f) {
+                        player->pushButton(PlayerButton::Jump);
                     }
+                }
+
+                // 🧱 TRATAMENTO DE BLOCOS SÓLIDOS E PAREDES
+                if (gameObj->m_objectType == GameObjectType::Solid) {
+                    // Se o bloco estiver exatamente na altura da cara do cubo (Parede vertical)
+                    float alturaCubo = hitboxPlayer.getMaxY() - hitboxPlayer.getMinY();
+                    bool paredeNaEspera = (hitboxObjeto.getMinY() < player->m_position.y + 10.0f) && (hitboxObjeto.getMaxY() > player->m_position.y);
+
+                    if ((isCube || isRobot) && paredeNaEspera && distX < 45.0f && player->m_isGrounded) {
+                        player->pushButton(PlayerButton::Jump); // Pula para subir no bloco em vez de estourar nele
+                        log::info("🤖 AI: Parede de Bloco detectada! Subindo na plataforma.");
+                    }
+                }
+
+                // 🟡 LEITURA DIRETA DAS ORBS (Mantido por ID de ativação)
+                int id = gameObj->m_objectID;
+                float centroX = abs(gameObj->m_position.x - posPlayer.x);
+                float centroY = abs(gameObj->m_position.y - posPlayer.y);
+
+                if (centroX < 28.0f && centroY < 28.0f) {
+                    // Orbs Normais
+                    if (id == GDOrbs::OrbAmarela || id == GDOrbs::OrbRosa || id == GDOrbs::OrbVermelha || 
+                        id == GDOrbs::OrbAzul || id == GDOrbs::OrbVerde) {
+                        
+                        player->releaseButton(PlayerButton::Jump);
+                        player->pushButton(PlayerButton::Jump);
+                    }
+
+                    // Dash Orbs Reais (Segura o botão de forma contínua)
+                    if ((id == GDOrbs::DashOrbVerde || id == GDOrbs::DashOrbRosa) && !segurandoDash) {
+                        segurandoDash = true;
+                        cronometroDash = 0.0f;
+                        player->pushButton(PlayerButton::Jump);
+                        log::info("🤖 AI: HOLD acionado na Dash Orb Real!");
+                    }
+                }
+
+                // Solta o botão automaticamente ao passar pelo perigo
+                if (!isWave && !isShip && !isSwing && !segurandoDash && distX > 75.0f) {
+                    player->releaseButton(PlayerButton::Jump);
                 }
             }
         }
