@@ -15,34 +15,26 @@ jobs:
     - name: Checkout do Repositorio
       uses: actions/checkout@v4
 
-    # 1. Instala o Geode CLI direto pelo terminal usando o script oficial deles
-    - name: Baixar e Instalar Geode CLI Nativamente
-      run: |
-        # Executa o script oficial de instalacao do Geode via PowerShell
-        Set-ExecutionPolicy Bypass -Scope Process -Force; iwr https://raw.githubusercontent.com/geode-sdk/cli/main/install.ps1 -UseBasicParsing | iex
-        
-        # Injeta a pasta do Geode no PATH do sistema para o GitHub reconhecer o comando 'geode'
-        echo "$env:USERPROFILE\.geode\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    # 🟢 A ACTION CORRETA: Instala a CLI oficial do Geode direto da raiz deles
+    - name: Configurar Geode CLI
+      uses: geode-sdk/setup-cli@v2
+
+    # 💡 Instala os binários pré-compilados do SDK para ir voando
+    - name: Instalar Binarios do SDK
+      run: geode sdk install-binaries
       shell: powershell
 
-    # 2. Configura o perfil e baixa os binários pré-compilados do SDK
-    - name: Inicializar SDK e Instalar Binarios
-      run: |
-        # Cria um perfil fake para a maquina virtual conseguir compilar sem precisar do jogo instalado
-        geode profile add --name CI dummy_path
-        geode profile select CI
-        
-        # A SUA IDÉIA MONSTRA: Baixa os binarios prontos do SDK para poupar tempo
-        geode sdk install-binaries
+    # Configura o perfil dummy para a máquina virtual buildar sem precisar do Geometry Dash instalado
+    - name: Configurar Perfil do Geode
+      run: geode profile add --name CI dummy_path
       shell: powershell
 
-    # 3. Compila o seu Mod forcando a plataforma do Windows moderna
+    # Compila o seu Mod de Pathfinder (.geode) forçando o ambiente de Windows
     - name: Compilar o Mod (.geode)
-      run: |
-        geode mod build --platform win
+      run: geode mod build --platform win
       shell: powershell
 
-    # 4. Salva o seu arquivo compilado para voce baixar na aba Actions
+    # Salva o arquivo final para você baixar e colocar na pasta mods do GD
     - name: Upload do Arquivo .geode Compilado
       uses: actions/upload-artifact@v4
       with:
