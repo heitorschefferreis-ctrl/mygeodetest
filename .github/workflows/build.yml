@@ -11,7 +11,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Compila para Windows, Android de 32 bits e Android de 64 bits de uma vez so!
         config:
         - name: Windows
           os: windows-latest
@@ -29,6 +28,10 @@ jobs:
     - name: Checkout do Repositorio
       uses: actions/checkout@v4
 
+    # 🟢 NOVO: Instala e configura a CLI do Geode na maquina virtual antes de rodar o CMake
+    - name: Setup do Geode CLI
+      uses: geode-sdk/setup-geode@main
+
     - name: Rodar o Compilador do Geode SDK
       uses: geode-sdk/build-geode-mod@main
       with:
@@ -36,7 +39,6 @@ jobs:
         bindings-ref: main
         target: ${{ matrix.config.target }}
 
-    # 🟢 AGORA SIM! A action oficial e correta para salvar o seu .geode:
     - name: Upload do Arquivo .geode Compilado
       uses: actions/upload-artifact@v4
       with:
