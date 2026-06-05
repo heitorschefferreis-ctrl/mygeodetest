@@ -15,14 +15,25 @@ jobs:
     - name: Checkout do Repositorio
       uses: actions/checkout@v4
 
-    # 🚀 A action oficial do Geode configurada apenas para o Windows
-    - name: Rodar o Compilador do Geode SDK
-      uses: geode-sdk/build-geode-mod@main
-      with:
-        target: win
+    # 1. Instala a CLI do Geode oficial no Windows Server do GitHub
+    - name: Configurar Geode CLI
+      uses: geode-sdk/setup-geode@v2
 
+    # 💡 A SUA IDÉIA: Baixa os binarios pre-compilados para nao perder tempo!
+    - name: Instalar Binarios do SDK
+      run: geode sdk install-binaries
+
+    # 2. Configura o perfil de build da maquina virtual
+    - name: Configurar Perfil do Geode
+      run: geode profile add --name CI dummy_path || true
+
+    # 3. Roda o build direto pela CLI do Geode forcando a plataforma 'win'
+    - name: Compilar o Mod para Windows
+      run: geode mod build --platform win
+
+    # 4. Guarda o seu arquivo .geode pronto para baixar
     - name: Upload do Arquivo .geode Compilado
       uses: actions/upload-artifact@v4
       with:
         name: Windows-Build
-        path: build/*.geode
+        path: "build/*.geode"
