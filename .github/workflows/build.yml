@@ -1,4 +1,4 @@
-name: Build Geode Mod
+name: Build Geode Mod (Apenas Windows)
 
 on:
   push:
@@ -8,56 +8,21 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-        - name: Windows
-          os: windows-latest
-          target: win
-        - name: Android32
-          os: ubuntu-latest
-          target: android32
-        - name: Android64
-          os: ubuntu-latest
-          target: android64
-
-    name: ${{ matrix.config.name }}
-    runs-on: ${{ matrix.config.os }}
+    name: Windows Build
+    runs-on: windows-latest
 
     steps:
     - name: Checkout do Repositorio
       uses: actions/checkout@v4
 
-    # 🟢 FORÇA BRUTA 1: Instala o CLI oficial do Geode direto do GitHub deles
-    - name: Instalar Geode CLI (Windows)
-      if: matrix.config.os == 'windows-latest'
-      run: |
-        gc idn | iex
-        echo "$env:USERPROFILE\.geode\bin" >> $GITHUB_PATH
-      shell: powershell
-
-    # 🟢 FORÇA BRUTA 2: Instala o CLI no Linux para os builds de Android
-    - name: Instalar Geode CLI (Linux)
-      if: matrix.config.os == 'ubuntu-latest'
-      run: |
-        curl -sSL https://raw.githubusercontent.com/geode-sdk/cli/main/install.sh | sh
-        echo "$HOME/.geode/bin" >> $GITHUB_PATH
-
-    # 🟢 FORÇA BRUTA 3: Configura o perfil do Geode antes de rodar o CMake
-    - name: Inicializar Perfil do Geode
-      run: |
-        geode profile add --name CI dummy_path || true
-        geode profile select CI
-
-    # 🚀 Agora a action oficial de build nao vai se perder porque o terreno ja foi preparado!
+    # 🚀 A action oficial do Geode configurada apenas para o Windows
     - name: Rodar o Compilador do Geode SDK
       uses: geode-sdk/build-geode-mod@main
       with:
-        target: ${{ matrix.config.target }}
+        target: win
 
     - name: Upload do Arquivo .geode Compilado
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.config.name }}-build
+        name: Windows-Build
         path: build/*.geode
