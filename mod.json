@@ -1,0 +1,34 @@
+{
+  "geode": "3.3.0",
+  "id": "ai_designer.pathfinderrouteassistant",
+  "version": "1.0.0",
+  "name": "A.I. Pathfinding & Swag Route Finder",
+  "developer": "SystemsArchitect",
+  "description": "An interactive, visual pathfinding mod. Jump over spikes/blocks automatically, toggle orb click logic to discover alternate swag routes (like Polargeist's secret coin path), and watch the real-time AI vector line guide you.",
+  "settings": {
+    "pathfinding-enabled": {
+      "name": "Enable Pathfinder",
+      "description": "Toggle all automatic simulation mechanics.",
+      "type": "bool",
+      "default": true
+    },
+    "pathfind-orbs": {
+      "name": "Register Rings/Orbs",
+      "description": "Turn off to ignore standard orb tracks and drop into hidden custom paths (e.g. Polargeist coin route).",
+      "type": "bool",
+      "default": true
+    },
+    "pathfind-spikes": {
+      "name": "Evade Spikes",
+      "description": "Auto-jump when a standard ground hazard is detected near the icon.",
+      "type": "bool",
+      "default": true
+    },
+    "pathfind-visuals": {
+      "name": "Show Vector Lines",
+      "description": "Draw path indicator segments dynamically on screen while playing.",
+      "type": "bool",
+      "default": true
+    }
+  }
+}

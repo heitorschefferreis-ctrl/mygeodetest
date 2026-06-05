@@ -1,0 +1,39 @@
+# GitHub Actions Workflow to build this Geode Mod automatically!
+# Save this file inside your repository as: .github/workflows/build.yml
+
+name: Build Geode Mod
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: Windows (64-bit)
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+          - name: Android (32 & 64 bit)
+            os: ubuntu-latest
+            target: Android
+
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Geode Mod
+        uses: geode-sdk/build-geode-mod@main
+        with:
+          bindings: true
+          target: ${{ matrix.config.target }}
