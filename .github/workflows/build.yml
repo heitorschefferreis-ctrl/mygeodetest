@@ -36,8 +36,9 @@ jobs:
         bindings-ref: main
         target: ${{ matrix.config.target }}
 
+    # 🟢 AGORA SIM! A action oficial e correta para salvar o seu .geode:
     - name: Upload do Arquivo .geode Compilado
-      uses: actions/allowed-artifacts@v1
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.config.name }}-build
         path: build/*.geode
