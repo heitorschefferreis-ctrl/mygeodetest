@@ -15,18 +15,33 @@ jobs:
     - name: Checkout do Repositorio
       uses: actions/checkout@v4
 
-    # 🟢 A ACTION CORRETA: Instala a CLI oficial do Geode direto da raiz deles
-    - name: Configurar Geode CLI
-      uses: geode-sdk/setup-cli@v2
+    # 🟢 BAIXA A CLI DIRETO DO RELEASE DO GITHUB (Sem usar Actions bugadas!)
+    # Baixa a versao v3.1.2 (ou a mais recente estavel da CLI deles)
+    # Se der erro de TLS, o Invoke-WebRequest resolve nativamente no Windows Server
+    name: Baixar e Instalar Geode CLI Manualmente
+    run: |
+      # Cria a pasta para a CLI
+      New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.geode\bin"
+      
+      # Baixa o zip oficial da CLI do Geode para Windows
+      Invoke-WebRequest -Uri "https://github.com/geode-sdk/cli/releases/latest/download/geode-cli-win.zip" -OutFile "geode-cli.zip"
+      
+      # Extrai o geode.exe direto na pasta de binarios
+      Expand-Archive -Path "geode-cli.zip" -DestinationPath "$env:USERPROFILE\.geode\bin" -Force
+      
+      # Adiciona a pasta ao PATH do GitHub Actions para os próximos passos reconhecerem o comando 'geode'
+      echo "$env:USERPROFILE\.geode\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    shell: powershell
 
-    # 💡 Instala os binários pré-compilados do SDK para ir voando
+    # 💡 A SUA IDÉIA: Instala os binários pré-compilados do SDK
     - name: Instalar Binarios do SDK
-      run: geode sdk install-binaries
-      shell: powershell
-
-    # Configura o perfil dummy para a máquina virtual buildar sem precisar do Geometry Dash instalado
-    - name: Configurar Perfil do Geode
-      run: geode profile add --name CI dummy_path
+      run: |
+        # Cria um perfil dummy pro compilador nao caçar o Geometry Dash na maquina virtual
+        geode profile add --name CI dummy_path
+        geode profile select CI
+        
+        # Baixa a estrutura base
+        geode sdk install-binaries
       shell: powershell
 
     # Compila o seu Mod de Pathfinder (.geode) forçando o ambiente de Windows
